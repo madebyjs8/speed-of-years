@@ -453,7 +453,7 @@
         <div class="lb-bottom"><span class="lb-mark edge-l">Birth</span><span class="lb-mark you" id="lbYou">You</span><span class="lb-mark edge-r" id="lbEnd"></span></div>
       </div>
       <p class="aside play-end" id="playEnd" aria-live="polite"></p>
-      <div class="play-ctrl"><button class="share replay" id="replay" type="button">Play</button><button class="textbtn" id="sound" type="button">Play with sound</button></div>
+      <div class="play-ctrl"><button class="share replay" id="replay" type="button">Play</button><button class="textbtn" id="sound" type="button" hidden>Mute</button></div>
     </section>
 
     <section class="beat shell" id="why">
@@ -661,6 +661,7 @@
 
   $('form').addEventListener('submit', e => {
     e.preventDefault();
+    unlockAudio();
     if (apply(true)) $('reveal').scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' });
   });
 
@@ -1156,6 +1157,7 @@
     const s = S, R = Math.ceil(s.life), gap = R > 45 ? 1 : 2;
     cancelAnimationFrame(PLAY.raf);
     soundStop();
+    $('sound').hidden = true;
     const segs = fut => Array.from({ length: R }, (_, a) =>
       `<i class="${a + 1 <= s.mem ? 'pre' : (fut && a + 1 > s.age ? 'fut' : '')}"></i>`).join('');
     $('lbBase').innerHTML = segs(false); $('lbFill').innerHTML = segs(true);
@@ -1213,10 +1215,11 @@
     $('playEnd').classList.add('on');
     $('lbYou').classList.remove('now');
     $('replay').textContent = 'Play it again';
+    $('sound').hidden = true;
   }
   // Optional ticking: one tick per year, scheduled on the audio clock so it stays in time
   // with the playback. Off until the visitor turns it on (browsers block sound before a click).
-  const SND = { on: false, ctx: null, bus: null };
+  const SND = { want: false, used: false, ctx: null, bus: null };
   function soundStop() {
     if (SND.bus) { try { SND.bus.disconnect(); } catch (e) {} SND.bus = null; }
   }
@@ -1232,7 +1235,7 @@
   function scheduleSound(s, fYou) {
     soundStop();
     const c = SND.ctx;
-    SND.bus = c.createGain(); SND.bus.gain.value = 0.6; SND.bus.connect(c.destination);
+    SND.bus = c.createGain(); SND.bus.gain.value = 0.9; SND.bus.connect(c.destination);
     const t0 = c.currentTime + 0.05, hold = fYou > 0 ? HOLD / 1000 : 0;
     // One piano note per year over a calm four-chord progression (C, G, Am, F), so the music
     // speeds up with the years. Notes get quieter as they crowd together near the end.
@@ -1253,17 +1256,19 @@
     if (fYou > 0) bell(t0 + PT / 1000 * fYou);
     bell(t0 + PT / 1000 + hold);
   }
-  // Sound is for one playback only: it starts with this button and is off again afterwards.
-  $('sound').addEventListener('click', () => {
+  // Browsers only allow sound after a tap, so the audio is switched on when the visitor
+  // presses "Show my life". The first playback then has sound; replays are silent.
+  function unlockAudio() {
     try {
+      if (navigator.audioSession) navigator.audioSession.type = 'playback';   // play even on iPhone silent mode
       SND.ctx = SND.ctx || new (window.AudioContext || window.webkitAudioContext)();
-      if (SND.ctx.state === 'suspended') SND.ctx.resume();
-    } catch (e) { return; }
-    SND.on = true;
-    play();
-    SND.on = false;
-  });
-  $('replay').addEventListener('click', () => { SND.on = false; });
+      if (SND.ctx.state !== 'running') SND.ctx.resume();
+      const b = SND.ctx.createBufferSource();                                     // a silent blip unlocks iOS
+      b.buffer = SND.ctx.createBuffer(1, 1, 22050); b.connect(SND.ctx.destination); b.start(0);
+      SND.want = true;
+    } catch (e) {}
+  }
+  $('sound').addEventListener('click', () => { soundStop(); $('sound').hidden = true; });
 
   function play() {
     const s = S;
@@ -1272,7 +1277,12 @@
     $('replay').textContent = 'Restart';
     if (reduced) { playFrame(s.life, 1); playEnd(); return; }
     const fYou = s.age > s.mem && s.age < s.life ? s.felt(s.age) : 0, t1 = PT * fYou;
-    if (SND.on && SND.ctx) scheduleSound(s, fYou);
+    if (SND.want && !SND.used && SND.ctx) {
+      if (SND.ctx.state !== 'running') SND.ctx.resume();
+      scheduleSound(s, fYou);
+      SND.used = true;
+      $('sound').hidden = false;
+    }
     const t0 = performance.now();
     const step = now => {
       let e = Math.max(0, now - t0);
