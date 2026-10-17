@@ -11,13 +11,13 @@ Enter your age, the age you expect to live to, and the age of your earliest memo
 
 ## The model
 
-Paul Janet (1877) suggested that a year feels as long as the share of your life it makes up. Adding up a lifetime of shrinking years gives a logarithm, counted from your earliest memory:
+Paul Janet (1877) suggested that each year feels shorter the more life you've already lived. This site uses Ronald Lemlich's milder 1975 version, where felt time shrinks with the square root of age, counted from your earliest memory:
 
 ```
-felt so far = ln(age / m) / ln(lifespan / m)     m = age of earliest memory
+felt so far = (√age − √m) / (√lifespan − √m)     m = age of earliest memory
 ```
 
-This is a thought experiment, not a measurement. The "How it works" panel on the site covers what the evidence does and doesn't support, including a square-root alternative (Lemlich, 1975) and the main counterarguments.
+This is a thought experiment, not a measurement. The "How it works" panel on the site covers what the evidence does and doesn't support, including Janet's stronger logarithmic version and the main counterarguments.
 
 ## How it's built
 
